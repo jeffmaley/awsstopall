@@ -122,10 +122,19 @@ def delete_autoscaling_group(autoscaling, autoscaling_group):
                         ForceDelete=True
     )
 
+def get_iam_users_helper(iam, marker):
+    return
+
+def get_iam_users(iam):
+    iam_users = []
+    result = iam.list_users()
+    return iam_users
+
 def main():
     ec2 = boto3.client('ec2')
     autoscaling = boto3.client('autoscaling')
     s3 = boto3.client('s3')
+    iam = boto3.client('iam')
 
     running_instances = get_ec2_instances(ec2)
     for instance in running_instances[0]:
