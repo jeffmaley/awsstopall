@@ -1,0 +1,113 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description:
+  This CloudFormation template will create a budget threshold and a Lambda function to halt services once the threshold is reached.
+
+Parameters:
+  UserEmail:
+    Description: Your email address for the budget alerts.
+    Type: String
+  BudgetAmount:
+    Description: Value for the budget alert
+    Type: Integer
+    Default: 100
+  BudgetThreshold:
+    Description: Percentage of BudgetAmount that should trigger the Lambda
+    Type: Integer
+    Default: 100
+  BudgetUnit:
+    Description: Currency unit for BudgetAmount (USD, GB, etc...)
+    Type: String
+    Default: USD
+  S3Bucket:
+    Description: S3 bucket for storing the Lambda zip
+    Type: String
+  ZipFileName:
+    Description: Name of the zip file containing the Lambda function
+    Type: String
+    Default: awsstopall-lambda.zip
+
+Resources:
+  LamdaExecRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'      
+      Description: Role for Lambda execution
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies: 
+        - PolicyName: RequiredAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeRegions'
+                  - 'ec2:StopInstances'
+                  - 'autoscaling:DescribeAutoScalingGroups'  
+                  - 'autoscaling:DeleteAutoScalingGroups' 
+                  - 's3:ListBuckets'
+                  - 's3:PutBucketPublicAccessBlock'     
+                  - 'ec2:ListUsers'
+                  - 'ec2:DeleteLoginProfile'
+                  - 'ec2:ListAccessKeys'
+                  - 'ec2:UpdateAccessKey'      
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties: 
+      Code: 
+        S3Bucket: !Ref S3Bucket
+        S3Key: !Ref ZipFilename
+      Description: Lambda function for disabling IAM Users, blocking S3, and stopping instances
+      Environment: 
+        Environment
+      Handler: main.main
+      PackageType: Zip
+      Role: !Ref LambdaExecRole
+      Runtime: python3.9
+      Timeout: 90
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties: 
+      DisplayName: BudgetAlert
+      Subscription: 
+        - LambdaFunction:
+            Endpoint:
+            Protocol: lambda
+        - UserEmail:
+            Endpoint: !Ref UserEmail
+            Protocol: email
+  Budget:
+    Type: AWS::Budgets::Budget
+    Properties: 
+      Budget: 
+        BudgetLimit: 
+          Amount: !Ref BudgetAmount
+          Unit: !Ref BudgetUnit
+        BudgetName: KeepCostsdown
+        BudgetType: COST
+        TimeUnit: MONTHLY
+      NotificationsWithSubscribers: 
+        - NotificationWithSubscribers:
+            Notification:
+              ComparisonOperator: GREATER_THAN
+              NotificationType: ACTUAL
+              Threshold: !Ref BudgetThreshold
+              ThresholdType: PERCENTAGE
+            Subscribers:
+              Address: !Ref SNSTopic
+              SubscriptionType: SNS 
+
+
+
+Outputs:
+  set of outputs

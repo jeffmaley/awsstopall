@@ -3,9 +3,15 @@ import sys
 import logging
 import traceback
 import json
+import os
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+disable_iam_users = os.environ['DISABLE_IAM_USERS']
+stop_ec2_instances = os.environ['STOP_EC2_INSTANCES']
+block_s3 = os.environ['BLOCK_S3']
+delete_autoscaling = os.environ['DELETE_AUTOSCALING']
 
 def get_regions(ec2):
     result = ec2.describe_regions()
@@ -147,10 +153,11 @@ def get_iam_users(iam):
     try:
         if result['Marker']:
             old_marker = 'old_marker'
-            result = get_iam_users_helper(iam, marker)
-            old_marker = marker
-            marker = result['Marker']
-            iam_users.append(result['Users'])
+            while old_marker != marker:
+                result = get_iam_users_helper(iam, marker)
+                old_marker = marker
+                marker = result['Marker']
+                iam_users.append(result['Users'])
     except KeyError:
         # No Marker
         pass
@@ -166,9 +173,15 @@ def get_iam_users(iam):
     return iam_users
 
 def delete_iam_user_profile(iam, iam_user):
-    result = iam.delete_login_profile(
-                UserName=iam_user
-    )
+    result = ''
+    try:
+        result = iam.delete_login_profile(
+                    UserName=iam_user
+        )
+    except iam.exceptions.NoSuchEntityException:
+        # No LoginProfile found
+        result = f'No LoginProfile found for {iam_user}'
+    logger.info(result)
     return
 
 def disable_iam_user_access_keys(iam_resource, iam_user):
@@ -180,25 +193,33 @@ def disable_iam_user_access_keys(iam_resource, iam_user):
     return
 
 def main():
-    ec2 = boto3.client('ec2')
-    autoscaling = boto3.client('autoscaling')
+    ec2_base = boto3.client('ec2')
     s3 = boto3.client('s3')
     iam = boto3.client('iam')
     iam_resource = boto3.resource('iam')
 
-    regions = get_regions(ec2)
+    regions = get_regions(ec2_base)
+    for region in regions:
+        print(region['RegionName'])
+        ec2 = boto3.client('ec2', region_name=region['RegionName'])
+        autoscaling = boto3.client('autoscaling', region_name=region['RegionName'])
+        running_instances = get_ec2_instances(ec2)
+        if running_instances:
+            for instance in running_instances[0]:
+                print(instance['InstanceId'])
+                stop_ec2_instances(ec2, instance['InstanceId'])
 
-    running_instances = get_ec2_instances(ec2)
-    if running_instances:
-        for instance in running_instances[0]:
-            print(instance['InstanceId'])
-            #stop_ec2_instances(ec2, instance['InstanceId'])
+        autoscaling_groups = get_autoscaling_groups(autoscaling)
+        if autoscaling_groups:
+            for autoscaling_group in autoscaling_groups[0]:
+                print(autoscaling_group['AutoScalingGroupName'])
+                delete_autoscaling_group(autoscaling, autoscaling_group['AutoScalingGroupName'])
 
     s3_buckets = get_s3_buckets(s3)
     if s3_buckets:
         for bucket in s3_buckets:
             print(bucket['Name'])
-            #block_s3_public_access(s3, bucket['Name'])
+            block_s3_public_access(s3, bucket['Name'])
 
     iam_users = get_iam_users(iam)
     if iam_users:
@@ -206,12 +227,6 @@ def main():
             print(iam_user['UserName'])
             delete_iam_user_profile(iam, iam_user['UserName'])
             disable_iam_user_access_keys(iam_resource, iam_user['UserName'])
-
-    autoscaling_groups = get_autoscaling_groups(autoscaling)
-    if autoscaling_groups:
-        for autoscaling_group in autoscaling_groups[0]:
-            print(autoscaling_group['AutoScalingGroupName'])
-            delete_autoscaling_group(autoscaling, autoscaling_group['AutoScalingGroupName'])
     return
 
 if __name__ == "__main__":
