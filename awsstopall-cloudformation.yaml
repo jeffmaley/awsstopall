@@ -15,7 +15,7 @@ Parameters:
   BudgetThreshold:
     Description: Percentage of BudgetAmount that should trigger the Lambda
     Type: Number
-    Default: 100
+    Default: 1
   BudgetUnit:
     Description: Currency unit for BudgetAmount (USD, GB, etc...)
     Type: String
@@ -27,27 +27,27 @@ Parameters:
   ZipFileName:
     Description: Name of the zip file containing the Lambda function
     Type: String
-    Default: main.zip
+    Default: awsstopall-lambda.zip
   DisableIamUsers:
     Description: Disable IAM users on budget threshold breach (yes/no)
     Type: String
-    AllowedValues: ["yes", "no"]
-    Default: no
+    AllowedValues: [true, false]
+    Default: false
   StopEc2Instances:
     Description: Stop running EC2 instances on budget threshold breach (yes/no)
     Type: String
-    AllowedValues: ["yes", "no"]
-    Default: yes
+    AllowedValues: [true, false]
+    Default: true
   BlockS3:
     Description: Block public access to S3 on budget threshold breach (yes/no)
     Type: String
-    AllowedValues: ["yes", "no"]
-    Default: yes
+    AllowedValues: [true, false]
+    Default: true
   DeleteAutoScalingGroups:
     Description: Delete AutoScaling Groups on budget threshold breach (yes/no)
     Type: String
-    AllowedValues: ["yes", "no"]
-    Default: yes
+    AllowedValues: [true, false]
+    Default: true
 
 Resources:
   LambdaExecRole:
@@ -77,7 +77,7 @@ Resources:
                   - 'ec2:StopInstances'
                   - 'autoscaling:DescribeAutoScalingGroups'  
                   - 'autoscaling:DeleteAutoScalingGroups' 
-                  - 's3:ListBuckets'
+                  - 's3:ListAllMyBuckets'
                   - 's3:PutBucketPublicAccessBlock'     
                   - 'ec2:ListUsers'
                   - 'ec2:DeleteLoginProfile'
@@ -102,6 +102,10 @@ Resources:
       Role: !GetAtt LambdaExecRole.Arn
       Runtime: python3.9
       Timeout: 90
+  CloudWatchLogs:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Join ["", ["/aws/lambda/", !Ref LambdaFunction]]
   SNSTopic:
     Type: AWS::SNS::Topic
     Properties: 
@@ -123,6 +127,7 @@ Resources:
                     - budgets.amazonaws.com
                 Action:
                   - 'sns:Publish'
+                Resource: !Ref SNSTopic
       Topics: 
         - !Ref SNSTopic
   Budget:
