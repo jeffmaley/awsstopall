@@ -11,7 +11,7 @@ logger.setLevel(logging.INFO)
 disable_iam_users = os.environ['DISABLE_IAM_USERS']
 stop_ec2_instances = os.environ['STOP_EC2_INSTANCES']
 block_s3 = os.environ['BLOCK_S3']
-delete_autoscaling = os.environ['DELETE_AUTOSCALING']
+delete_autoscaling_groups = os.environ['DELETE_AUTOSCALING_GROUPS']
 
 def get_regions(ec2):
     result = ec2.describe_regions()

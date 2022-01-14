@@ -7,13 +7,14 @@ Parameters:
   UserEmail:
     Description: Your email address for the budget alerts.
     Type: String
+    Default: jeff@warysec.io
   BudgetAmount:
     Description: Value for the budget alert
-    Type: Integer
+    Type: Number
     Default: 100
   BudgetThreshold:
     Description: Percentage of BudgetAmount that should trigger the Lambda
-    Type: Integer
+    Type: Number
     Default: 100
   BudgetUnit:
     Description: Currency unit for BudgetAmount (USD, GB, etc...)
@@ -22,13 +23,30 @@ Parameters:
   S3Bucket:
     Description: S3 bucket for storing the Lambda zip
     Type: String
+    Default: lambda-source-448798155788
   ZipFileName:
     Description: Name of the zip file containing the Lambda function
     Type: String
-    Default: awsstopall-lambda.zip
+    Default: main.zip
+  DisableIamUsers:
+    Description: Disable IAM users on budget threshold breach (yes/no)
+    Type: String
+    Default: no
+  StopEc2Instances:
+    Description: Stop running EC2 instances on budget threshold breach (yes/no)
+    Type: String
+    Default: yes
+  BlockS3:
+    Description: Block public access to S3 on budget threshold breach (yes/no)
+    Type: String
+    Default: yes
+  DeleteAutoScalingGroups:
+    Description: Delete AutoScaling Groups on budget threshold breach (yes/no)
+    Type: String
+    Default: yes
 
 Resources:
-  LamdaExecRole:
+  LambdaExecRole:
     Type: AWS::IAM::Role
     Properties: 
       AssumeRolePolicyDocument:
@@ -60,31 +78,34 @@ Resources:
                   - 'ec2:ListUsers'
                   - 'ec2:DeleteLoginProfile'
                   - 'ec2:ListAccessKeys'
-                  - 'ec2:UpdateAccessKey'      
+                  - 'ec2:UpdateAccessKey'
+                Resource: '*'
   LambdaFunction:
     Type: AWS::Lambda::Function
     Properties: 
       Code: 
         S3Bucket: !Ref S3Bucket
-        S3Key: !Ref ZipFilename
+        S3Key: !Ref ZipFileName
       Description: Lambda function for disabling IAM Users, blocking S3, and stopping instances
       Environment: 
-        Environment
+        Variables:
+          DISABLE_IAM_USERS: !Ref DisableIamUsers
+          STOP_EC2_INSTANCES: !Ref StopEc2Instances
+          BLOCK_S3: !Ref BlockS3
+          DELETE_AUTOSCALING_GROUPS: !Ref DeleteAutoScalingGroups
       Handler: main.main
       PackageType: Zip
-      Role: !Ref LambdaExecRole
+      Role: !GetAtt LambdaExecRole.Arn
       Runtime: python3.9
       Timeout: 90
   SNSTopic:
     Type: AWS::SNS::Topic
     Properties: 
       DisplayName: BudgetAlert
-      Subscription: 
-        - LambdaFunction:
-            Endpoint:
+      Subscription:
+          - Endpoint: !GetAtt LambdaFunction.Arn
             Protocol: lambda
-        - UserEmail:
-            Endpoint: !Ref UserEmail
+          - Endpoint: !Ref UserEmail
             Protocol: email
   Budget:
     Type: AWS::Budgets::Budget
@@ -97,17 +118,22 @@ Resources:
         BudgetType: COST
         TimeUnit: MONTHLY
       NotificationsWithSubscribers: 
-        - NotificationWithSubscribers:
-            Notification:
+          - Notification:
               ComparisonOperator: GREATER_THAN
               NotificationType: ACTUAL
               Threshold: !Ref BudgetThreshold
               ThresholdType: PERCENTAGE
             Subscribers:
-              Address: !Ref SNSTopic
-              SubscriptionType: SNS 
-
-
+              - Address: !Ref SNSTopic
+                SubscriptionType: SNS 
 
 Outputs:
-  set of outputs
+  LambdaExecRoleName:
+    Description: Name of the Lambda execution role
+    Value: !GetAtt LambdaExecRole.RoleId
+  LambdaFunctionName:
+    Description: Name of the Lambda function
+    Value: !Ref LambdaFunction
+  SNSTopicName:
+    Description: Name of the SNS topic
+    Value: !GetAtt SNSTopic.TopicName
