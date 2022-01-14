@@ -201,32 +201,36 @@ def main():
     regions = get_regions(ec2_base)
     for region in regions:
         print(region['RegionName'])
-        ec2 = boto3.client('ec2', region_name=region['RegionName'])
-        autoscaling = boto3.client('autoscaling', region_name=region['RegionName'])
-        running_instances = get_ec2_instances(ec2)
-        if running_instances:
-            for instance in running_instances[0]:
-                print(instance['InstanceId'])
-                stop_ec2_instances(ec2, instance['InstanceId'])
+        if stop_ec2_instances == 'yes':
+            ec2 = boto3.client('ec2', region_name=region['RegionName'])
+            autoscaling = boto3.client('autoscaling', region_name=region['RegionName'])
+            running_instances = get_ec2_instances(ec2)
+            if running_instances:
+                for instance in running_instances[0]:
+                    print(instance['InstanceId'])
+                    stop_ec2_instances(ec2, instance['InstanceId'])
+                    
+        if delete_autoscaling_groups == 'yes':
+            autoscaling_groups = get_autoscaling_groups(autoscaling)
+            if autoscaling_groups:
+                for autoscaling_group in autoscaling_groups[0]:
+                    print(autoscaling_group['AutoScalingGroupName'])
+                    delete_autoscaling_group(autoscaling, autoscaling_group['AutoScalingGroupName'])
 
-        autoscaling_groups = get_autoscaling_groups(autoscaling)
-        if autoscaling_groups:
-            for autoscaling_group in autoscaling_groups[0]:
-                print(autoscaling_group['AutoScalingGroupName'])
-                delete_autoscaling_group(autoscaling, autoscaling_group['AutoScalingGroupName'])
+    if block_s3 == 'yes':
+        s3_buckets = get_s3_buckets(s3)
+        if s3_buckets:
+            for bucket in s3_buckets:
+                print(bucket['Name'])
+                block_s3_public_access(s3, bucket['Name'])
 
-    s3_buckets = get_s3_buckets(s3)
-    if s3_buckets:
-        for bucket in s3_buckets:
-            print(bucket['Name'])
-            block_s3_public_access(s3, bucket['Name'])
-
-    iam_users = get_iam_users(iam)
-    if iam_users:
-        for iam_user in iam_users[0]:
-            print(iam_user['UserName'])
-            delete_iam_user_profile(iam, iam_user['UserName'])
-            disable_iam_user_access_keys(iam_resource, iam_user['UserName'])
+    if disable_iam_users == 'yes':
+        iam_users = get_iam_users(iam)
+        if iam_users:
+            for iam_user in iam_users[0]:
+                print(iam_user['UserName'])
+                delete_iam_user_profile(iam, iam_user['UserName'])
+                disable_iam_user_access_keys(iam_resource, iam_user['UserName'])
     return
 
 if __name__ == "__main__":

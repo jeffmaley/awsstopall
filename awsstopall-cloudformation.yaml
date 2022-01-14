@@ -31,18 +31,22 @@ Parameters:
   DisableIamUsers:
     Description: Disable IAM users on budget threshold breach (yes/no)
     Type: String
+    AllowedValues: ["yes", "no"]
     Default: no
   StopEc2Instances:
     Description: Stop running EC2 instances on budget threshold breach (yes/no)
     Type: String
+    AllowedValues: ["yes", "no"]
     Default: yes
   BlockS3:
     Description: Block public access to S3 on budget threshold breach (yes/no)
     Type: String
+    AllowedValues: ["yes", "no"]
     Default: yes
   DeleteAutoScalingGroups:
     Description: Delete AutoScaling Groups on budget threshold breach (yes/no)
     Type: String
+    AllowedValues: ["yes", "no"]
     Default: yes
 
 Resources:
@@ -107,6 +111,20 @@ Resources:
             Protocol: lambda
           - Endpoint: !Ref UserEmail
             Protocol: email
+  SNSTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties: 
+      PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service:
+                    - budgets.amazonaws.com
+                Action:
+                  - 'sns:Publish'
+      Topics: 
+        - !Ref SNSTopic
   Budget:
     Type: AWS::Budgets::Budget
     Properties: 
@@ -114,7 +132,6 @@ Resources:
         BudgetLimit: 
           Amount: !Ref BudgetAmount
           Unit: !Ref BudgetUnit
-        BudgetName: KeepCostsdown
         BudgetType: COST
         TimeUnit: MONTHLY
       NotificationsWithSubscribers: 
