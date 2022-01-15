@@ -16,6 +16,8 @@ This application performs the following actions when triggered:
 * Upload the awsstopall-lambda.zip to an S3 bucket
 * Run the cloudformation template `awsstopall-cloudformation.yaml` and provide the necessary values.
 
+NOTE: The account you use to deploy must have write access to Billing (https://docs.aws.amazon.com/IAM/latest/UserGuide/tutorial_billing.html).
+
 ## TODO
 
 * Stop RDS
