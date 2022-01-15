@@ -7,7 +7,7 @@ Parameters:
   UserEmail:
     Description: Your email address for the budget alerts.
     Type: String
-    Default: jeff@warysec.io
+    Default: you@email.domain
   BudgetAmount:
     Description: Value for the budget alert
     Type: Number
@@ -15,7 +15,7 @@ Parameters:
   BudgetThreshold:
     Description: Percentage of BudgetAmount that should trigger the Lambda
     Type: Number
-    Default: 1
+    Default: 100
   BudgetUnit:
     Description: Currency unit for BudgetAmount (USD, GB, etc...)
     Type: String
@@ -23,7 +23,7 @@ Parameters:
   S3Bucket:
     Description: S3 bucket for storing the Lambda zip
     Type: String
-    Default: lambda-source-448798155788
+    Default: bucketname
   ZipFileName:
     Description: Name of the zip file containing the Lambda function
     Type: String
@@ -76,13 +76,13 @@ Resources:
                   - 'ec2:DescribeRegions'
                   - 'ec2:StopInstances'
                   - 'autoscaling:DescribeAutoScalingGroups'  
-                  - 'autoscaling:DeleteAutoScalingGroups' 
+                  - 'autoscaling:DeleteAutoScalingGroup' 
                   - 's3:ListAllMyBuckets'
                   - 's3:PutBucketPublicAccessBlock'     
-                  - 'ec2:ListUsers'
-                  - 'ec2:DeleteLoginProfile'
-                  - 'ec2:ListAccessKeys'
-                  - 'ec2:UpdateAccessKey'
+                  - 'iam:ListUsers'
+                  - 'iam:DeleteLoginProfile'
+                  - 'iam:ListAccessKeys'
+                  - 'iam:UpdateAccessKey'
                 Resource: '*'
   LambdaFunction:
     Type: AWS::Lambda::Function
